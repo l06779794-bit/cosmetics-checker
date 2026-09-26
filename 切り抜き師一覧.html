@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>切り抜き＆ライバー管理アプリ</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    /* タッチ・UI調整 */
+    body {
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    input, textarea, button {
+      user-select: auto;
+    }
+    /* スクロールバー非表示 */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    @keyframes popIn {
+      0% { opacity: 0; transform: scale(0.9); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+    .animate-pop-in {
+      animation: popIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    .animate-slide-up {
+      animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 pb-10 font-sans min-h-screen">
+
+  <!-- 上部固定ヘッダー ＆ タブナビゲーションエリア -->
+  <header class="sticky top-0 z-30 bg-indigo-600 text-white shadow-md">
+    <!-- タイトルバー -->
+    <div class="px-4 py-3 flex items-center justify-between border-b border-indigo-500/30">
+      <h1 class="text-base sm:text-lg font-bold flex items-center gap-2">
+        <i class="fa-solid fa-scissors"></i>
+        <span>切り抜きデータベース</span>
+      </h1>
+      <span id="data-count-badge" class="bg-indigo-800 text-indigo-100 text-xs px-2.5 py-1 rounded-full font-medium">
+        0件
+      </span>
+    </div>
+
+    <!-- 上部固定タブナビゲーション（Chrome等の下部操作バーと干渉しません） -->
+    <nav class="bg-white text-slate-500 border-b border-slate-200 shadow-sm">
+      <div class="max-w-md mx-auto flex justify-around">
+        <button type="button" onclick="switchTab('add')" id="nav-add"
+          class="nav-btn flex-1 py-2.5 text-center text-indigo-600 font-bold border-b-2 border-indigo-600 transition-all flex flex-col items-center justify-center gap-0.5">
+          <i class="fa-solid fa-plus text-sm"></i>
+          <span class="text-[11px]">データ追加</span>
+        </button>
+
+        <button type="button" onclick="switchTab('clipper-search')" id="nav-clipper-search"
+          class="nav-btn flex-1 py-2.5 text-center text-slate-500 font-normal border-b-2 border-transparent transition-all flex flex-col items-center justify-center gap-0.5">
+          <i class="fa-solid fa-user-gear text-sm"></i>
+          <span class="text-[11px]">切り抜き師</span>
+        </button>
+
+        <button type="button" onclick="switchTab('liver-search')" id="nav-liver-search"
+          class="nav-btn flex-1 py-2.5 text-center text-slate-500 font-normal border-b-2 border-transparent transition-all flex flex-col items-center justify-center gap-0.5">
+          <i class="fa-solid fa-video text-sm"></i>
+          <span class="text-[11px]">ライバー</span>
+        </button>
+
+        <button type="button" onclick="switchTab('all-list')" id="nav-all-list"
+          class="nav-btn flex-1 py-2.5 text-center text-slate-500 font-normal border-b-2 border-transparent transition-all flex flex-col items-center justify-center gap-0.5">
+          <i class="fa-solid fa-list-ul text-sm"></i>
+          <span class="text-[11px]">一覧データ</span>
+        </button>
+      </div>
+    </nav>
+  </header>
+
+  <!-- メインコンテンツ領域 -->
+  <main class="max-w-md mx-auto p-4">
+
+    <!-- 1. データの追加 タブ -->
+    <section id="tab-add" class="tab-content space-y-4">
+      <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+        <h2 class="text-base font-bold text-slate-800 mb-4 flex items-center gap-2 border-b pb-2">
+          <i class="fa-solid fa-plus-circle text-indigo-500"></i>
+          新しい切り抜きデータを登録
+        </h2>
+
+        <!-- 重複警告メッセージ -->
+        <div id="duplicate-warning" class="hidden mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs flex items-center gap-2">
+          <i class="fa-solid fa-triangle-exclamation text-amber-500 text-base flex-shrink-0"></i>
+          <div>
+            <strong>同じ組み合わせが存在します</strong><br>
+            この切り抜き師とライバーのデータは既に登録されています。
+          </div>
+        </div>
+
+        <form id="add-form" class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">
+              切り抜き師の名前 <span class="text-red-500">*</span>
+            </label>
+            <div class="relative">
+              <i class="fa-solid fa-user-gear absolute left-3 top-3 text-slate-400 text-sm"></i>
+              <input type="text" id="input-clipper" required placeholder="例: 切り抜き太郎"
+                class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">
+              ライバーの名前 <span class="text-red-500">*</span>
+              <span class="text-[10px] text-indigo-600 font-normal ml-1">（「、」や「,」で区切って複数登録可）</span>
+            </label>
+            <div class="relative">
+              <i class="fa-solid fa-video absolute left-3 top-3 text-slate-400 text-sm"></i>
+              <input type="text" id="input-liver" required placeholder="例: 虹乃ましろ、星空ひかり"
+                class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all">
+            </div>
+            <!-- 入力中の複数ライバープレビュー表示 -->
+            <div id="input-liver-tags" class="flex flex-wrap gap-1 mt-2 min-h-[24px]"></div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">
+              動画タイトル
+            </label>
+            <div class="relative">
+              <i class="fa-solid fa-heading absolute left-3 top-3 text-slate-400 text-sm"></i>
+              <input type="text" id="input-title" placeholder="例: 神回まとめ・爆笑ハプニング集"
+                class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">
+              YouTube動画のURL
+            </label>
+            <div class="relative">
+              <i class="fa-brands fa-youtube absolute left-3 top-3 text-slate-400 text-sm"></i>
+              <input type="url" id="input-url" placeholder="例: https://www.youtube.com/watch?v=..."
+                class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all">
+            </div>
+          </div>
+
+          <button type="submit"
+            class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold rounded-xl text-sm shadow-md shadow-indigo-100 flex items-center justify-center gap-2 transition-all">
+            <i class="fa-solid fa-paper-plane"></i>
+            登録する
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <!-- 2. 切り抜き師検索 タブ -->
+    <section id="tab-clipper-search" class="tab-content hidden space-y-4">
+      <div class="relative">
+        <i class="fa-solid fa-magnifying-glass absolute left-3 top-3.5 text-slate-400 text-sm"></i>
+        <input type="text" id="search-clipper-input" placeholder="切り抜き師の名前で検索..."
+          class="w-full pl-9 pr-8 py-3 bg-white border border-slate-200 rounded-2xl text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <button id="clear-clipper-search" type="button" class="hidden absolute right-3 top-3 text-slate-400 hover:text-slate-600 text-sm">
+          <i class="fa-solid fa-circle-xmark"></i>
+        </button>
+      </div>
+
+      <div id="clipper-results-list" class="space-y-3">
+        <!-- 検索結果が動的挿入されます -->
+      </div>
+    </section>
+
+    <!-- 3. ライバー検索 タブ -->
+    <section id="tab-liver-search" class="tab-content hidden space-y-4">
+      <div class="relative">
+        <i class="fa-solid fa-magnifying-glass absolute left-3 top-3.5 text-slate-400 text-sm"></i>
+        <input type="text" id="search-liver-input" placeholder="ライバーの名前で検索..."
+          class="w-full pl-9 pr-8 py-3 bg-white border border-slate-200 rounded-2xl text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <button id="clear-liver-search" type="button" class="hidden absolute right-3 top-3 text-slate-400 hover:text-slate-600 text-sm">
+          <i class="fa-solid fa-circle-xmark"></i>
+        </button>
+      </div>
+
+      <div id="liver-results-list" class="space-y-3">
+        <!-- 検索結果が動的挿入されます -->
+      </div>
+    </section>
+
+    <!-- 4. 一覧 タブ -->
+    <section id="tab-all-list" class="tab-content hidden space-y-4">
+      <div class="flex items-center justify-between px-1">
+        <h2 class="text-sm font-bold text-slate-700">登録データ全件</h2>
+        <button id="btn-reset-data" type="button" class="text-xs text-slate-400 hover:text-red-500 flex items-center gap-1 transition-colors">
+          <i class="fa-solid fa-trash-can"></i> 全データを削除
+        </button>
+      </div>
+
+      <div id="all-data-list" class="space-y-3">
+        <!-- 全一覧カードが動的挿入されます -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- 切り抜き師 詳細モーダル -->
+  <div id="clipper-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-end sm:items-center justify-center p-0 sm:p-4" tabIndex="-1">
+    <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-slide-up">
+      <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-lg">
+            <i class="fa-solid fa-user-gear"></i>
+          </div>
+          <div>
+            <h3 id="modal-clipper-name" class="font-bold text-slate-800 text-base">切り抜き師名</h3>
+            <p class="text-xs text-slate-500">制作実績のあるライバー一覧</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeModal('clipper-modal')" class="w-8 h-8 rounded-full bg-slate-200/60 text-slate-500 hover:bg-slate-200 flex items-center justify-center">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div id="modal-clipper-content" class="p-4 overflow-y-auto space-y-3 text-sm">
+        <!-- 切り抜き師制作データ -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ライバー 詳細モーダル -->
+  <div id="liver-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-end sm:items-center justify-center p-0 sm:p-4" tabIndex="-1">
+    <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-slide-up">
+      <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-purple-50">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold text-lg">
+            <i class="fa-solid fa-video"></i>
+          </div>
+          <div>
+            <h3 id="modal-liver-name" class="font-bold text-slate-800 text-base">ライバー名</h3>
+            <p class="text-xs text-purple-600 font-medium">担当した切り抜き師の一覧</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeModal('liver-modal')" class="w-8 h-8 rounded-full bg-slate-200/60 text-slate-500 hover:bg-slate-200 flex items-center justify-center">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="p-4 overflow-y-auto">
+        <p class="text-xs text-slate-500 mb-3 font-semibold">このライバーの切り抜きを投稿した切り抜き師：</p>
+        <div id="modal-liver-content" class="space-y-2">
+          <!-- 切り抜き師名リスト -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 編集モーダル -->
+  <div id="edit-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-end sm:items-center justify-center p-0 sm:p-4" tabIndex="-1">
+    <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-slide-up">
+      <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+        <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
+          <i class="fa-solid fa-pen-to-square text-indigo-500"></i>
+          データを編集
+        </h3>
+        <button type="button" onclick="closeModal('edit-modal')" class="w-8 h-8 rounded-full bg-slate-200/60 text-slate-500 hover:bg-slate-200 flex items-center justify-center">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <form id="edit-form" class="p-4 overflow-y-auto space-y-4">
+        <input type="hidden" id="edit-id">
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">切り抜き師の名前 <span class="text-red-500">*</span></label>
+          <input type="text" id="edit-clipper" required class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">
+            ライバーの名前 <span class="text-red-500">*</span>
+            <span class="text-[10px] text-indigo-600 font-normal ml-1">（「、」や「,」で複数入力可）</span>
+          </label>
+          <input type="text" id="edit-liver" required class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <div id="edit-liver-tags" class="flex flex-wrap gap-1 mt-2 min-h-[20px]"></div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">動画タイトル</label>
+          <input type="text" id="edit-title" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">YouTube URL</label>
+          <input type="url" id="edit-url" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <div class="flex gap-2 pt-2">
+          <button type="button" onclick="closeModal('edit-modal')" class="w-1/2 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl text-sm">
+            キャンセル
+          </button>
+          <button type="submit" class="w-1/2 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm shadow-md shadow-indigo-100">
+            保存する
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ポップアップ通知モーダル (完了通知・お知らせ用) -->
+  <div id="message-popup-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4" tabIndex="-1">
+    <div class="bg-white w-full max-w-xs rounded-2xl p-6 text-center shadow-2xl animate-pop-in border border-slate-100">
+      <div id="popup-icon-container" class="w-14 h-14 mx-auto mb-3 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-2xl">
+        <i id="popup-icon" class="fa-solid fa-circle-check"></i>
+      </div>
+      <h3 id="popup-title" class="font-bold text-slate-800 text-base mb-1">通知タイトル</h3>
+      <p id="popup-message" class="text-xs text-slate-500 mb-5 leading-relaxed">メッセージが表示されます</p>
+      <button id="message-popup-ok-btn" type="button" onclick="closeModal('message-popup-modal')" class="w-full py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl text-xs shadow-md transition-all focus:ring-2 focus:ring-offset-2 focus:ring-slate-800">
+        確認 (Enter)
+      </button>
+    </div>
+  </div>
+
+  <!-- 削除確認 ポップアップモーダル -->
+  <div id="confirm-popup-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4" tabIndex="-1">
+    <div class="bg-white w-full max-w-xs rounded-2xl p-6 text-center shadow-2xl animate-pop-in border border-slate-100">
+      <div class="w-14 h-14 mx-auto mb-3 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-2xl">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+      </div>
+      <h3 id="confirm-popup-title" class="font-bold text-slate-800 text-base mb-1">データを削除しますか？</h3>
+      <p id="confirm-popup-message" class="text-xs text-slate-500 mb-5 leading-relaxed">この操作は取り消せません。</p>
+      <div class="flex gap-2">
+        <button id="confirm-popup-cancel-btn" type="button" onclick="closeModal('confirm-popup-modal')" class="w-1/2 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl text-xs transition-colors">
+          キャンセル
+        </button>
+        <button id="confirm-popup-btn" type="button" class="w-1/2 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs shadow-md transition-all focus:ring-2 focus:ring-offset-2 focus:ring-red-600">
+          削除する (Enter)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript ロジック -->
+  <script>
+    const STORAGE_KEY = 'clipper_liver_db_data_v3';
+    let clipData = [];
+    let pendingDeleteAction = null; // 削除保留処理
+    let lastFocusedElement = null; // モーダルを開く前のフォーカス位置を記憶
+
+    // データ件数表示の更新関数（ReferenceError防止）
+    function updateDataCount() {
+      const badge = document.getElementById('data-count-badge');
+      if (badge) {
+        badge.textContent = `${clipData.length}件`;
+      }
+    }
+
+    // アプリ初期化
+    document.addEventListener('DOMContentLoaded', () => {
+      loadData();
+      setupEventListeners();
+      updateDataCount();
+      renderAllList();
+      renderClipperSearch();
+      renderLiverSearch();
+    });
+
+    // LocalStorageからデータ読み込み
+    function loadData() {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          clipData = JSON.parse(saved);
+        } catch (e) {
+          clipData = [];
+        }
+      } else {
+        clipData = [];
+      }
+      updateDataCount();
+    }
+
+    // LocalStorageへ保存
+    function saveData() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(clipData));
+      updateDataCount();
+    }
+
+    // 入力されたライバー文字を配列に分解（読点、カンマ、空白、改行に対応）
+    function parseLiverInput(rawInput) {
+      if (!rawInput) return [];
+      return rawInput
+        .split(/[,、\n]+/)
+        .map(name => name.trim())
+        .filter(name => name.length > 0);
+    }
+
+    // 複数ライバーのプレビュータグを描画するヘルパー関数
+    function renderLiverTags(rawInput, containerId) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+      const livers = parseLiverInput(rawInput);
+
+      if (livers.length === 0) {
+        container.innerHTML = '';
+        return;
+      }
+
+      container.innerHTML = livers.map(liver => `
+        <span class="inline-flex items-center gap-1 text-[11px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium animate-pop-in">
+          <i class="fa-solid fa-video text-[9px]"></i> ${escapeHtml(liver)}
+        </span>
+      `).join('');
+    }
+
+    // イベントリスナー設定
+    function setupEventListeners() {
+      // 登録フォーム送信
+      document.getElementById('add-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        addNewData();
+      });
+
+      // 重複判定（リアルタイム入力）＆ライバープレビュータグ更新
+      const clipperInput = document.getElementById('input-clipper');
+      const liverInput = document.getElementById('input-liver');
+      const checkDuplicate = () => {
+        const clipper = clipperInput.value.trim();
+        const rawLiver = liverInput.value;
+        const livers = parseLiverInput(rawLiver);
+        const warning = document.getElementById('duplicate-warning');
+
+        // タグのプレビュー表示
+        renderLiverTags(rawLiver, 'input-liver-tags');
+
+        if (clipper && livers.length > 0) {
+          const hasDup = livers.some(l => isDuplicate(clipper, l));
+          if (hasDup) {
+            warning.classList.remove('hidden');
+          } else {
+            warning.classList.add('hidden');
+          }
+        } else {
+          warning.classList.add('hidden');
+        }
+      };
+      clipperInput.addEventListener('input', checkDuplicate);
+      liverInput.addEventListener('input', checkDuplicate);
+
+      // 編集フォーム送信
+      document.getElementById('edit-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        saveEditedData();
+      });
+
+      // 編集フォームのライバー入力リアルタイムタグ更新
+      const editLiverInput = document.getElementById('edit-liver');
+      editLiverInput.addEventListener('input', () => {
+        renderLiverTags(editLiverInput.value, 'edit-liver-tags');
+      });
+
+      // 検索インプット
+      setupSearchInput('search-clipper-input', 'clear-clipper-search', renderClipperSearch);
+      setupSearchInput('search-liver-input', 'clear-liver-search', renderLiverSearch);
+
+      // データ全削除ボタン（確認ポップアップを開く）
+      document.getElementById('btn-reset-data').addEventListener('click', () => {
+        if (clipData.length === 0) {
+          showPopupModal('お知らせ', '削除するデータがありません。', 'info');
+          return;
+        }
+        showConfirmModal('全データの削除', '登録されているすべてのデータを削除しますか？この操作は戻せません。', () => {
+          clipData = [];
+          saveData();
+          refreshAllViews();
+          showPopupModal('削除完了', 'すべてのデータを削除しました。', 'delete');
+        });
+      });
+
+      // 削除確認ポップアップの「削除する」ボタンを押したときの処理
+      document.getElementById('confirm-popup-btn').addEventListener('click', () => {
+        closeModal('confirm-popup-modal');
+        if (pendingDeleteAction) {
+          pendingDeleteAction();
+          pendingDeleteAction = null;
+        }
+      });
+
+      // キーボード操作強化（Escキーで閉じる / ポップアップ表示時のEnter操作対応）
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          const openModals = document.querySelectorAll('.fixed:not(.hidden)');
+          openModals.forEach(modal => {
+            closeModal(modal.id);
+          });
+        }
+      });
+    }
+
+    function setupSearchInput(inputId, clearBtnId, renderFunc) {
+      const input = document.getElementById(inputId);
+      const clearBtn = document.getElementById(clearBtnId);
+
+      input.addEventListener('input', () => {
+        if (input.value.length > 0) {
+          clearBtn.classList.remove('hidden');
+        } else {
+          clearBtn.classList.add('hidden');
+        }
+        renderFunc();
+      });
+
+      clearBtn.addEventListener('click', () => {
+        input.value = '';
+        clearBtn.classList.add('hidden');
+        renderFunc();
+      });
+    }
+
+    // 重複チェック関数
+    function isDuplicate(clipper, liver, excludeId = null) {
+      return clipData.some(item => 
+        item.clipper.toLowerCase() === clipper.toLowerCase() &&
+        item.liver.toLowerCase() === liver.toLowerCase() &&
+        item.id !== excludeId
+      );
+    }
+
+    // 新規追加処理 (複数ライバー一括対応)
+    function addNewData() {
+      const clipper = document.getElementById('input-clipper').value.trim();
+      const rawLiver = document.getElementById('input-liver').value;
+      const title = document.getElementById('input-title').value.trim();
+      const url = document.getElementById('input-url').value.trim();
+
+      const livers = parseLiverInput(rawLiver);
+
+      if (!clipper || livers.length === 0) return;
+
+      let addedCount = 0;
+      const now = Date.now();
+
+      livers.forEach((liverName, index) => {
+        const newItem = {
+          id: (now + index).toString(),
+          clipper,
+          liver: liverName,
+          title: title || 'タイトルなし',
+          url: url || '',
+          createdAt: new Date().toISOString()
+        };
+        clipData.unshift(newItem);
+        addedCount++;
+      });
+
+      saveData();
+
+      // フォーム初期化
+      document.getElementById('add-form').reset();
+      document.getElementById('duplicate-warning').classList.add('hidden');
+      renderLiverTags('', 'input-liver-tags');
+
+      refreshAllViews();
+
+      // 登録完了のポップアップメッセージ表示
+      if (addedCount === 1) {
+        showPopupModal('登録が完了しました！', `「${clipper}」×「${livers[0]}」のデータを保存しました。`, 'success');
+      } else {
+        showPopupModal('一括登録が完了しました！', `「${clipper}」× ライバー${addedCount}名（${livers.join('、')}）のデータを登録しました。`, 'success');
+      }
+    }
+
+    // 編集画面を開く
+    function openEditModal(id) {
+      const item = clipData.find(d => d.id === id);
+      if (!item) return;
+
+      document.getElementById('edit-id').value = item.id;
+      document.getElementById('edit-clipper').value = item.clipper;
+      document.getElementById('edit-liver').value = item.liver;
+      document.getElementById('edit-title').value = item.title === 'タイトルなし' ? '' : item.title;
+      document.getElementById('edit-url').value = item.url;
+
+      renderLiverTags(item.liver, 'edit-liver-tags');
+
+      openModal('edit-modal');
+    }
+
+    // 編集内容の保存
+    function saveEditedData() {
+      const id = document.getElementById('edit-id').value;
+      const clipper = document.getElementById('edit-clipper').value.trim();
+      const rawLiver = document.getElementById('edit-liver').value;
+      const title = document.getElementById('edit-title').value.trim();
+      const url = document.getElementById('edit-url').value.trim();
+
+      const livers = parseLiverInput(rawLiver);
+      if (!clipper || livers.length === 0) return;
+
+      const index = clipData.findIndex(d => d.id === id);
+      if (index !== -1) {
+        clipData[index] = {
+          ...clipData[index],
+          clipper,
+          liver: livers[0],
+          title: title || 'タイトルなし',
+          url: url || ''
+        };
+
+        // 2人目以降は新規挿入
+        if (livers.length > 1) {
+          const now = Date.now();
+          for (let i = 1; i < livers.length; i++) {
+            clipData.unshift({
+              id: (now + i).toString(),
+              clipper,
+              liver: livers[i],
+              title: title || 'タイトルなし',
+              url: url || '',
+              createdAt: new Date().toISOString()
+            });
+          }
+        }
+
+        saveData();
+        refreshAllViews();
+        closeModal('edit-modal');
+        showPopupModal('更新完了', 'データを正常に更新しました。', 'success');
+      }
+    }
+
+    // 個別データ削除（確認ポップアップ）
+    function deleteData(id) {
+      const item = clipData.find(d => d.id === id);
+      const nameStr = item ? `「${item.clipper} × ${item.liver}」` : 'このデータ';
+
+      showConfirmModal('データの削除', `${nameStr}を削除しますか？`, () => {
+        clipData = clipData.filter(d => d.id !== id);
+        saveData();
+        refreshAllViews();
+        showPopupModal('削除完了', 'データを削除しました。', 'delete');
+      });
+    }
+
+    // ポップアップ表示（成功・削除・通知）
+    function showPopupModal(title, message, type = 'success') {
+      const iconContainer = document.getElementById('popup-icon-container');
+      const icon = document.getElementById('popup-icon');
+
+      document.getElementById('popup-title').textContent = title;
+      document.getElementById('popup-message').textContent = message;
+
+      if (type === 'success') {
+        iconContainer.className = "w-14 h-14 mx-auto mb-3 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-2xl";
+        icon.className = "fa-solid fa-circle-check";
+      } else if (type === 'delete') {
+        iconContainer.className = "w-14 h-14 mx-auto mb-3 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-2xl";
+        icon.className = "fa-solid fa-trash-can";
+      } else {
+        iconContainer.className = "w-14 h-14 mx-auto mb-3 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-2xl";
+        icon.className = "fa-solid fa-circle-info";
+      }
+
+      openModal('message-popup-modal');
+    }
+
+    // 削除確認モーダル表示
+    function showConfirmModal(title, message, onConfirm) {
+      document.getElementById('confirm-popup-title').textContent = title;
+      document.getElementById('confirm-popup-message').textContent = message;
+      pendingDeleteAction = onConfirm;
+      openModal('confirm-popup-modal');
+    }
+
+    // 全ての表示領域を更新
+    function refreshAllViews() {
+      renderAllList();
+      renderClipperSearch();
+      renderLiverSearch();
+    }
+
+    // 全一覧のレンダリング
+    function renderAllList() {
+      const container = document.getElementById('all-data-list');
+
+      if (clipData.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-12 text-slate-400">
+            <i class="fa-solid fa-folder-open text-4xl mb-2"></i>
+            <p class="text-sm font-medium">登録されているデータはありません</p>
+            <p class="text-xs text-slate-400 mt-1">「データ追加」タブから登録できます</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = clipData.map(item => `
+        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between gap-3">
+          <div class="space-y-1.5">
+            <div class="flex items-center gap-2 text-xs font-semibold">
+              <span class="bg-indigo-50 text-indigo-600 px-2.5 py-0.5 rounded-md flex items-center gap-1">
+                <i class="fa-solid fa-user-gear text-[10px]"></i> ${escapeHtml(item.clipper)}
+              </span>
+              <i class="fa-solid fa-arrow-right text-slate-300 text-[10px]"></i>
+              <span class="bg-purple-50 text-purple-600 px-2.5 py-0.5 rounded-md flex items-center gap-1">
+                <i class="fa-solid fa-video text-[10px]"></i> ${escapeHtml(item.liver)}
+              </span>
+            </div>
+
+            <p class="text-xs font-bold text-slate-800 line-clamp-2 pt-1">
+              ${escapeHtml(item.title)}
+            </p>
+
+            ${item.url ? `
+              <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-[11px] text-red-600 font-medium hover:underline pt-0.5">
+                <i class="fa-brands fa-youtube"></i> YouTubeで観る
+              </a>
+            ` : ''}
+          </div>
+
+          <div class="flex items-center justify-end gap-2 border-t border-slate-50 pt-2.5">
+            <button type="button" onclick="openEditModal('${item.id}')" class="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors">
+              <i class="fa-solid fa-pen"></i> 編集
+            </button>
+            <button type="button" onclick="deleteData('${item.id}')" class="px-3 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors">
+              <i class="fa-solid fa-trash"></i> 削除
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // 切り抜き師検索のレンダリング
+    function renderClipperSearch() {
+      const keyword = document.getElementById('search-clipper-input').value.trim().toLowerCase();
+      const container = document.getElementById('clipper-results-list');
+
+      if (clipData.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-12 text-slate-400">
+            <i class="fa-solid fa-user-slash text-3xl mb-2"></i>
+            <p class="text-xs">データがまだ登録されていません</p>
+          </div>
+        `;
+        return;
+      }
+
+      const clippersMap = {};
+      clipData.forEach(item => {
+        if (!clippersMap[item.clipper]) {
+          clippersMap[item.clipper] = [];
+        }
+        clippersMap[item.clipper].push(item);
+      });
+
+      const clipperNames = Object.keys(clippersMap).filter(name => 
+        name.toLowerCase().includes(keyword)
+      );
+
+      if (clipperNames.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-10 text-slate-400">
+            <p class="text-xs">該当する切り抜き師は見つかりませんでした</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = clipperNames.map(name => {
+        const items = clippersMap[name];
+        const livers = [...new Set(items.map(i => i.liver))];
+
+        return `
+          <div onclick="openClipperModal('${escapeHtml(name)}')" class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 active:bg-slate-50 transition-all cursor-pointer">
+            <div class="flex justify-between items-center mb-2">
+              <div class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                <i class="fa-solid fa-user-gear text-indigo-500"></i>
+                ${escapeHtml(name)}
+              </div>
+              <span class="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
+                制作: ${items.length}件
+              </span>
+            </div>
+            <div class="flex flex-wrap gap-1">
+              ${livers.map(l => `
+                <span class="text-[10px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded-md font-medium">
+                  <i class="fa-solid fa-video text-[9px] mr-0.5"></i> ${escapeHtml(l)}
+                </span>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ライバー検索のレンダリング
+    function renderLiverSearch() {
+      const keyword = document.getElementById('search-liver-input').value.trim().toLowerCase();
+      const container = document.getElementById('liver-results-list');
+
+      if (clipData.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-12 text-slate-400">
+            <i class="fa-solid fa-video-slash text-3xl mb-2"></i>
+            <p class="text-xs">データがまだ登録されていません</p>
+          </div>
+        `;
+        return;
+      }
+
+      const liversMap = {};
+      clipData.forEach(item => {
+        if (!liversMap[item.liver]) {
+          liversMap[item.liver] = [];
+        }
+        liversMap[item.liver].push(item);
+      });
+
+      const liverNames = Object.keys(liversMap).filter(name => 
+        name.toLowerCase().includes(keyword)
+      );
+
+      if (liverNames.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-10 text-slate-400">
+            <p class="text-xs">該当するライバーは見つかりませんでした</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = liverNames.map(name => {
+        const items = liversMap[name];
+        const clippers = [...new Set(items.map(i => i.clipper))];
+
+        return `
+          <div onclick="openLiverModal('${escapeHtml(name)}')" class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 active:bg-slate-50 transition-all cursor-pointer">
+            <div class="flex justify-between items-center mb-2">
+              <div class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                <i class="fa-solid fa-video text-purple-500"></i>
+                ${escapeHtml(name)}
+              </div>
+              <span class="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-bold">
+                切り抜き師: ${clippers.length}名
+              </span>
+            </div>
+            <div class="flex flex-wrap gap-1">
+              ${clippers.map(c => `
+                <span class="text-[11px] bg-indigo-50 text-indigo-600 px-2.5 py-0.5 rounded-md font-medium">
+                  <i class="fa-solid fa-user-gear text-[9px] mr-1"></i>${escapeHtml(c)}
+                </span>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 切り抜き師 モーダル表示
+    function openClipperModal(clipperName) {
+      document.getElementById('modal-clipper-name').textContent = clipperName;
+      const items = clipData.filter(d => d.clipper === clipperName);
+      const container = document.getElementById('modal-clipper-content');
+
+      container.innerHTML = items.map(item => `
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
+          <div class="text-xs font-bold text-purple-600 mb-1 flex items-center gap-1">
+            <i class="fa-solid fa-video"></i> ${escapeHtml(item.liver)}
+          </div>
+          <div class="text-xs font-semibold text-slate-800 mb-1.5 line-clamp-2">
+            ${escapeHtml(item.title)}
+          </div>
+          ${item.url ? `
+            <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-[11px] text-red-600 font-medium hover:underline">
+              <i class="fa-brands fa-youtube"></i> YouTubeで再生
+            </a>
+          ` : ''}
+        </div>
+      `).join('');
+
+      openModal('clipper-modal');
+    }
+
+    // ライバー モーダル表示
+    function openLiverModal(liverName) {
+      document.getElementById('modal-liver-name').textContent = liverName;
+      const items = clipData.filter(d => d.liver === liverName);
+      
+      const clipperCounts = {};
+      items.forEach(item => {
+        clipperCounts[item.clipper] = (clipperCounts[item.clipper] || 0) + 1;
+      });
+
+      const container = document.getElementById('modal-liver-content');
+
+      container.innerHTML = Object.keys(clipperCounts).map(clipperName => `
+        <div class="bg-indigo-50/70 p-3 rounded-xl border border-indigo-100 flex items-center justify-between">
+          <div class="font-bold text-slate-800 text-xs flex items-center gap-2">
+            <div class="w-7 h-7 rounded-full bg-indigo-200 text-indigo-700 flex items-center justify-center text-xs">
+              <i class="fa-solid fa-user-gear"></i>
+            </div>
+            <span>${escapeHtml(clipperName)}</span>
+          </div>
+          <span class="text-[10px] font-bold bg-white text-indigo-600 px-2 py-1 rounded-lg border border-indigo-100">
+            制作数: ${clipperCounts[clipperName]}件
+          </span>
+        </div>
+      `).join('');
+
+      openModal('liver-modal');
+    }
+
+    // モーダル操作ユーティリティ (フォーカス制御 & Tabキー循環)
+    function openModal(id) {
+      lastFocusedElement = document.activeElement;
+      const modal = document.getElementById(id);
+      if (!modal) return;
+      modal.classList.remove('hidden');
+
+      setTimeout(() => {
+        if (id === 'confirm-popup-modal') {
+          const btn = document.getElementById('confirm-popup-btn');
+          if (btn) btn.focus();
+        } else if (id === 'message-popup-modal') {
+          const btn = document.getElementById('message-popup-ok-btn');
+          if (btn) btn.focus();
+        } else {
+          const firstFocusable = modal.querySelector('button, input, a, [tabindex="0"]');
+          if (firstFocusable) firstFocusable.focus();
+        }
+      }, 50);
+    }
+
+    function closeModal(id) {
+      const modal = document.getElementById(id);
+      if (!modal) return;
+      modal.classList.add('hidden');
+
+      if (lastFocusedElement && typeof lastFocusedElement.focus === 'function') {
+        lastFocusedElement.focus();
+      }
+    }
+
+    // 上部固定タブ切替関数
+    function switchTab(tabName) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.classList.remove('text-indigo-600', 'font-bold', 'border-indigo-600');
+        btn.classList.add('text-slate-500', 'font-normal', 'border-transparent');
+      });
+
+      document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+      const activeNav = document.getElementById(`nav-${tabName}`);
+      activeNav.classList.remove('text-slate-500', 'font-normal', 'border-transparent');
+      activeNav.classList.add('text-indigo-600', 'font-bold', 'border-indigo-600');
+
+      if (tabName === 'all-list') renderAllList();
+      if (tabName === 'clipper-search') renderClipperSearch();
+      if (tabName === 'liver-search') renderLiverSearch();
+    }
+
+    // HTMLエスケープ処理（XSS対策）
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+  </script>
+</body>
+</html>

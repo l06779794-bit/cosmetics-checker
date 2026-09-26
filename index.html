@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>コスメ成分チェッカー</title>
+  <style>
+    :root {
+      --primary-color: #e8637a;
+      --primary-light: #fdf0f2;
+      --warning-color: #e67e22;
+      --danger-color: #e74c3c;
+      --safe-color: #2ecc71;
+      --bg-color: #f8f9fa;
+      --card-bg: #ffffff;
+      --text-main: #333333;
+      --text-sub: #666666;
+      --border-color: #eeeeee;
+      --radius: 12px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding-bottom: 90px;
+      min-height: 100vh;
+    }
+
+    /* ヘッダー */
+    header {
+      background-color: var(--card-bg);
+      padding: 16px 20px;
+      text-align: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    header h1 {
+      font-size: 1.2rem;
+      color: var(--primary-color);
+      font-weight: bold;
+    }
+
+    /* メインコンテンツエリア */
+    main {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+
+    /* タブ切り替え表示制御 */
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* カードUI */
+    .card {
+      background-color: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 18px;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+      border: 1px solid var(--border-color);
+    }
+
+    .card-title {
+      font-size: 1rem;
+      font-weight: bold;
+      margin-bottom: 12px;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* フォームUI */
+    label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-sub);
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    input[type="text"], textarea, select {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      background-color: #fafafa;
+      font-size: 0.95rem;
+      margin-bottom: 12px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="text"]:focus, textarea:focus, select:focus {
+      border-color: var(--primary-color);
+      background-color: #fff;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 90px;
+    }
+
+    /* ボタンUI */
+    .btn {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 8px;
+      background-color: var(--primary-color);
+      color: white;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: opacity 0.2s;
+      display: inline-block;
+      text-align: center;
+    }
+
+    .btn:active {
+      opacity: 0.8;
+    }
+
+    .btn-secondary {
+      background-color: #718093;
+    }
+
+    .btn-outline {
+      background-color: transparent;
+      border: 1px solid var(--primary-color);
+      color: var(--primary-color);
+    }
+
+    .btn-danger {
+      background-color: var(--danger-color);
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 8px;
+    }
+
+    /* クイック選択チップ */
+    .chip-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .chip {
+      background-color: var(--primary-light);
+      color: var(--primary-color);
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .chip:active {
+      background-color: var(--primary-color);
+      color: white;
+    }
+
+    /* 判定結果エリア */
+    .result-box {
+      border-radius: 8px;
+      padding: 14px;
+      margin-top: 12px;
+    }
+
+    .result-box.danger {
+      background-color: #fde8e8;
+      border: 1px solid #f8b4b4;
+      color: var(--danger-color);
+    }
+
+    .result-box.safe {
+      background-color: #eafaf1;
+      border: 1px solid #a3e4d7;
+      color: var(--safe-color);
+    }
+
+    .match-tag {
+      display: inline-block;
+      background: rgba(231, 76, 60, 0.1);
+      color: var(--danger-color);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      font-weight: bold;
+      margin: 4px 4px 4px 0;
+    }
+
+    /* リスト要素 */
+    .item-list {
+      list-style: none;
+    }
+
+    .list-item {
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .list-item:last-child {
+      border-bottom: none;
+    }
+
+    .list-item-title {
+      font-weight: bold;
+      font-size: 0.95rem;
+    }
+
+    .list-item-sub {
+      font-size: 0.8rem;
+      color: var(--text-sub);
+      margin-top: 2px;
+    }
+
+    .delete-btn {
+      background: none;
+      border: none;
+      color: var(--danger-color);
+      font-size: 0.85rem;
+      cursor: pointer;
+      padding: 6px;
+    }
+
+    /* ボトムナビゲーション */
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background-color: var(--card-bg);
+      display: flex;
+      justify-content: space-around;
+      padding: 10px 0 calc(10px + env(safe-area-inset-bottom));
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+      border-top: 1px solid var(--border-color);
+      z-index: 100;
+    }
+
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-size: 0.7rem;
+      color: var(--text-sub);
+      text-decoration: none;
+      cursor: pointer;
+      width: 25%;
+    }
+
+    .nav-item.active {
+      color: var(--primary-color);
+      font-weight: bold;
+    }
+
+    .nav-icon {
+      font-size: 1.3rem;
+      margin-bottom: 2px;
+    }
+
+    /* カスタムトースト通知 */
+    #toast {
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background-color: #333;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 30px;
+      font-size: 0.85rem;
+      opacity: 0;
+      transition: all 0.3s ease;
+      z-index: 200;
+      pointer-events: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    #toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>コスメ成分チェッカー</h1>
+  </header>
+
+  <main>
+    <!-- タブ1：成分チェック -->
+    <section id="tab-check" class="tab-content active">
+      <div class="card">
+        <div class="card-title">🔍 全成分判定</div>
+        <label>成分リストを貼り付け・入力</label>
+        <textarea id="check-input" placeholder="例: 水、BG、グリセリン、エタノール、メチルパラベン..."></textarea>
+        
+        <label>クイック追加</label>
+        <div class="chip-container">
+          <span class="chip" onclick="addChip('パラベン')">+ パラベン</span>
+          <span class="chip" onclick="addChip('エタノール')">+ エタノール</span>
+          <span class="chip" onclick="addChip('ジメチコン')">+ ジメチコン</span>
+          <span class="chip" onclick="addChip('合成香料')">+ 合成香料</span>
+          <span class="chip" onclick="addChip('サリチル酸')">+ サリチル酸</span>
+        </div>
+
+        <button class="btn" onclick="checkIngredients()">成分を判定する</button>
+      </div>
+
+      <div id="check-result" class="card" style="display: none;">
+        <div class="card-title">📋 判定結果</div>
+        <div id="result-content"></div>
+      </div>
+    </section>
+
+    <!-- タブ2：コスメ履歴 -->
+    <section id="tab-products" class="tab-content">
+      <div class="card">
+        <div class="card-title">💄 使用コスメの登録</div>
+        <label>コスメ名 / ブランド名</label>
+        <input type="text" id="prod-name" placeholder="例: リペアモイストローション (ブランドA)">
+        
+        <label>使用感・相性評価</label>
+        <select id="prod-status">
+          <option value="GOOD">⭕ 問題なし・お気に入り</option>
+          <option value="NG">❌ 肌荒れした・合わなかった</option>
+          <option value="CHECK">⚠️ 要注意・使い心地保留</option>
+        </select>
+
+        <label>全成分（任意）</label>
+        <textarea id="prod-ingredients" placeholder="成分リストを入力しておくと自動で記録されます"></textarea>
+
+        <label>メモ・症状</label>
+        <input type="text" id="prod-memo" placeholder="例: 頬に少し赤みが出た、保湿力は高い">
+
+        <button class="btn" onclick="saveProduct()">登録・保存する</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📜 登録済みコスメ履歴</div>
+        <input type="text" id="search-prod" placeholder="コスメ名で検索..." oninput="renderProducts()">
+        <ul id="product-list" class="item-list"></ul>
+      </div>
+    </section>
+
+    <!-- タブ3：成分データベース管理 -->
+    <section id="tab-db" class="tab-content">
+      <div class="card">
+        <div class="card-title">⚠️ 注意・避ける成分の追加</div>
+        <label>成分名</label>
+        <input type="text" id="db-name" placeholder="例: エタノール">
+        
+        <label>危険度 / 分類</label>
+        <select id="db-level">
+          <option value="NG">❌ 絶対避ける（肌荒れ直結）</option>
+          <option value="WARN">⚠️ 注意（高濃度で乾燥など）</option>
+        </select>
+
+        <label>理由・メモ</label>
+        <input type="text" id="db-memo" placeholder="例: 赤み・かゆみが発生したため">
+
+        <button class="btn btn-secondary" onclick="addDbIngredient()">データベースに追加</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📚 登録済みの注意成分リスト</div>
+        <ul id="db-list" class="item-list"></ul>
+      </div>
+    </section>
+
+    <!-- タブ4：設定＆データ管理 -->
+    <section id="tab-settings" class="tab-content">
+      <div class="card">
+        <div class="card-title">💾 データのバックアップ・復元</div>
+        <p style="font-size: 0.85rem; color: var(--text-sub); margin-bottom: 12px;">
+          データをファイルとして保存（エクスポート）したり、復元（インポート）することができます。
+        </p>
+        <div class="btn-group" style="margin-bottom: 10px;">
+          <button class="btn btn-outline" onclick="exportData()">データを出力(JSON)</button>
+          <label class="btn btn-outline" style="margin: 0; text-align: center; line-height: 24px;">
+            復元(JSON選択)
+            <input type="file" id="import-file" accept=".json" style="display: none;" onchange="importData(event)">
+          </label>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title" style="color: var(--danger-color);">🗑️ データリセット</div>
+        <p style="font-size: 0.85rem; color: var(--text-sub); margin-bottom: 12px;">
+          保存されたすべての成分データ・コスメ履歴を全削除します。
+        </p>
+        <button class="btn btn-danger" onclick="resetAllData()">全データを初期化する</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- 下部ナビバー -->
+  <nav class="bottom-nav">
+    <div class="nav-item active" onclick="switchTab('check', this)">
+      <div class="nav-icon">🔍</div>
+      <div>成分チェック</div>
+    </div>
+    <div class="nav-item" onclick="switchTab('products', this)">
+      <div class="nav-icon">💄</div>
+      <div>コスメ履歴</div>
+    </div>
+    <div class="nav-item" onclick="switchTab('db', this)">
+      <div class="nav-icon">⚠️</div>
+      <div>成分DB</div>
+    </div>
+    <div class="nav-item" onclick="switchTab('settings', this)">
+      <div class="nav-icon">⚙️</div>
+      <div>設定</div>
+    </div>
+  </nav>
+
+  <!-- 通知トースト -->
+  <div id="toast">メッセージ</div>
+
+  <script>
+    const STORAGE_KEY = 'cosme_checker_app_data';
+
+    let appData = {
+      db: [
+        { name: 'メチルパラベン', level: 'WARN', memo: '防腐剤（ピリつく場合あり）' },
+        { name: 'エタノール', level: 'WARN', memo: 'アルコール成分（乾燥・赤み）' },
+        { name: '合成香料', level: 'NG', memo: 'アレルギーリスク' }
+      ],
+      products: []
+    };
+
+    function loadData() {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          appData = JSON.parse(saved);
+        } catch (e) {
+          console.error('データ読み込み失敗', e);
+        }
+      }
+      renderDbList();
+      renderProducts();
+    }
+
+    function saveData() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.innerText = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2000);
+    }
+
+    function switchTab(tabId, element) {
+      document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+      
+      document.getElementById('tab-' + tabId).classList.add('active');
+      element.classList.add('active');
+      window.scrollTo(0, 0);
+    }
+
+    function addChip(text) {
+      const input = document.getElementById('check-input');
+      input.value += (input.value ? '、' : '') + text;
+    }
+
+    function checkIngredients() {
+      const text = document.getElementById('check-input').value;
+      if (!text.trim()) {
+        showToast('成分を入力してください');
+        return;
+      }
+
+      const matches = [];
+      appData.db.forEach(item => {
+        if (text.includes(item.name)) {
+          matches.push(item);
+        }
+      });
+
+      const resultCard = document.getElementById('check-result');
+      const resultContent = document.getElementById('result-content');
+      resultCard.style.display = 'block';
+
+      if (matches.length > 0) {
+        let html = `
+          <div class="result-box danger">
+            <strong>⚠️ 避けるべき/注意成分が ${matches.length} 件見つかりました</strong><br><br>
+            ${matches.map(m => `
+              <div>
+                <span class="match-tag">${m.level === 'NG' ? '❌ 避ける' : '⚠️ 注意'} ${m.name}</span>
+                <span style="font-size:0.8rem; color:#666;">(${m.memo || 'メモなし'})</span>
+              </div>
+            `).join('')}
+          </div>
+        `;
+        resultContent.innerHTML = html;
+      } else {
+        resultContent.innerHTML = `
+          <div class="result-box safe">
+            <strong>✨ クリア！注意成分は見つかりませんでした。</strong><br>
+            <span style="font-size:0.85rem;">(※登録データベース上のチェック結果です)</span>
+          </div>
+        `;
+      }
+    }
+
+    function saveProduct() {
+      const name = document.getElementById('prod-name').value.trim();
+      const status = document.getElementById('prod-status').value;
+      const ingredients = document.getElementById('prod-ingredients').value;
+      const memo = document.getElementById('prod-memo').value;
+
+      if (!name) {
+        showToast('コスメ名を入力してください');
+        return;
+      }
+
+      const newProd = {
+        id: Date.now(),
+        name,
+        status,
+        ingredients,
+        memo,
+        date: new Date().toLocaleDateString('ja-JP')
+      };
+
+      appData.products.unshift(newProd);
+      saveData();
+      renderProducts();
+
+      document.getElementById('prod-name').value = '';
+      document.getElementById('prod-ingredients').value = '';
+      document.getElementById('prod-memo').value = '';
+      showToast('コスメを記録しました');
+    }
+
+    function renderProducts() {
+      const list = document.getElementById('product-list');
+      const keyword = document.getElementById('search-prod').value.toLowerCase();
+      list.innerHTML = '';
+
+      const filtered = appData.products.filter(p => p.name.toLowerCase().includes(keyword));
+
+      if (filtered.length === 0) {
+        list.innerHTML = '<li style="color:#888; font-size:0.85rem; padding:12px 0;">該当するコスメはありません</li>';
+        return;
+      }
+
+      filtered.forEach(p => {
+        const li = document.createElement('li');
+        li.className = 'list-item';
+
+        let badge = '⭕';
+        if (p.status === 'NG') badge = '❌';
+        if (p.status === 'CHECK') badge = '⚠️';
+
+        li.innerHTML = `
+          <div>
+            <div class="list-item-title">${badge} ${p.name}</div>
+            <div class="list-item-sub">${p.date} ${p.memo ? ' | ' + p.memo : ''}</div>
+          </div>
+          <button class="delete-btn" onclick="deleteProduct(${p.id})">削除</button>
+        `;
+        list.appendChild(li);
+      });
+    }
+
+    function deleteProduct(id) {
+      if (confirm('このコスメ履歴を削除しますか？')) {
+        appData.products = appData.products.filter(p => p.id !== id);
+        saveData();
+        renderProducts();
+        showToast('削除しました');
+      }
+    }
+
+    function addDbIngredient() {
+      const name = document.getElementById('db-name').value.trim();
+      const level = document.getElementById('db-level').value;
+      const memo = document.getElementById('db-memo').value.trim();
+
+      if (!name) {
+        showToast('成分名を入力してください');
+        return;
+      }
+
+      appData.db.push({ name, level, memo });
+      saveData();
+      renderDbList();
+
+      document.getElementById('db-name').value = '';
+      document.getElementById('db-memo').value = '';
+      showToast('注意成分を追加しました');
+    }
+
+    function renderDbList() {
+      const list = document.getElementById('db-list');
+      list.innerHTML = '';
+
+      if (appData.db.length === 0) {
+        list.innerHTML = '<li style="color:#888; font-size:0.85rem; padding:12px 0;">注意成分が未登録です</li>';
+        return;
+      }
+
+      appData.db.forEach((item, index) => {
+        const li = document.createElement('li');
+        li.className = 'list-item';
+        li.innerHTML = `
+          <div>
+            <div class="list-item-title">${item.level === 'NG' ? '❌' : '⚠️'} ${item.name}</div>
+            <div class="list-item-sub">${item.memo || 'メモなし'}</div>
+          </div>
+          <button class="delete-btn" onclick="deleteDbIngredient(${index})">削除</button>
+        `;
+        list.appendChild(li);
+      });
+    }
+
+    function deleteDbIngredient(index) {
+      if (confirm('この注意成分をデータベースから削除しますか？')) {
+        appData.db.splice(index, 1);
+        saveData();
+        renderDbList();
+        showToast('削除しました');
+      }
+    }
+
+    function exportData() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `cosme_data_${new Date().toISOString().slice(0,10)}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      showToast('データを出力しました');
+    }
+
+    function importData(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const imported = JSON.parse(e.target.result);
+          if (imported.db && imported.products) {
+            appData = imported;
+            saveData();
+            renderDbList();
+            renderProducts();
+            showToast('データを復元しました！');
+          } else {
+            alert('ファイルのフォーマットが正しくありません');
+          }
+        } catch (err) {
+          alert('JSONファイルの読み込みに失敗しました');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function resetAllData() {
+      if (confirm('本当にすべてのデータを削除して初期化しますか？')) {
+        localStorage.removeItem(STORAGE_KEY);
+        appData = { db: [], products: [] };
+        renderDbList();
+        renderProducts();
+        showToast('初期化しました');
+      }
+    }
+
+    loadData();
+  </script>
+</body>
+</html>
